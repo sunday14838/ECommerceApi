@@ -65,6 +65,8 @@ namespace ECommerceApi
             builder.Services.AddScoped<JwtService>();
             builder.Services.AddScoped<AuthService>();
             builder.Services.AddScoped<ProductService>();
+            builder.Services.AddScoped<CartService>();
+            builder.Services.AddScoped<OrderService>();
 
             builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
