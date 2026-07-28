@@ -1,76 +1,173 @@
-﻿using ECommerceApi.Data;
+﻿using AutoMapper;
+using ECommerceApi.Data;
 using ECommerceApi.DTOs;
 using ECommerceApi.Models;
+using ECommerceApi.Repositories.Interfaces;
+using ECommerceApi.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
+using System.Threading.Tasks;
 
 namespace ECommerceApi.Services
 {
+#pragma warning disable CS1591
     public class ProductService
     {
-        private readonly AppDbContext context;
+        private readonly IProductRepository productRepository;
+        private readonly IMapper mapper;
+        private readonly IImageService imageService;
+        private readonly ILogger<ProductService> logger;
+        private readonly IMemoryCache cache;
 
-        public ProductService(AppDbContext context)
+        public ProductService(IProductRepository productRepository, IMapper mapper, IImageService imageService,
+            ILogger<ProductService> logger,
+            IMemoryCache cache)
         {
-            this.context = context;
+            this.productRepository = productRepository;
+            this.mapper = mapper;
+            this.imageService = imageService;
+            this.logger = logger;
+            this.cache = cache;
         }
 
-        public List<Product> GetAll()
+        public async Task<List<Product>> GetAll()
         {
-            var products = context.Products.ToList();
+            List<Product> products = (await productRepository.GetAllAsync()).ToList();
             return products;
         }
 
-        public Product GetById(int id) 
+        public async Task<IEnumerable<ProductResponseDto>> GetProductsAsync(ProductQueryParameters parameters)
         {
-            var product = context.Products.FirstOrDefault(p => p.Id == id);
-            if (product == null)
+            //var products = await productRepository.GetProductsAsync(parameters);
+
+            //return mapper.Map<IEnumerable<ProductResponseDto>>(products);
+
+            const string cacheKey = "products";
+
+            if (!cache.TryGetValue(cacheKey, out IEnumerable<ProductResponseDto>? products))
             {
-                throw new Exception("Product not found");
+                logger.LogInformation("Loading products from database");
+
+                var data = await productRepository.GetProductsAsync(parameters);
+
+                products = mapper.Map<IEnumerable<ProductResponseDto>>(data);
+
+                var options = new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+                    SlidingExpiration = TimeSpan.FromMinutes(2)
+                };
+
+                cache.Set(cacheKey, products, options);
             }
+            else
+            {
+                logger.LogInformation("Products loaded from cache");
+            }
+
+            return products ?? Enumerable.Empty<ProductResponseDto>();
+        }
+
+        public async Task<ProductResponseDto> GetById(int id) 
+        {
+            string cacheKey = $"product_{id}";
+
+            //var product =   await productRepository.GetById(id);
+            //if (product == null)
+            //{
+            //    throw new Exception("Product not found");
+            //}
+
+            if (cache.TryGetValue(cacheKey, out ProductResponseDto? product) && product != null)
+            {
+                return product;
+            }
+
+            var entity = await productRepository.GetById(id);
+
+                if (entity == null)
+                    throw new Exception("Product not found.");
+
+                product = mapper.Map<ProductResponseDto>(entity);
+
+                cache.Set(cacheKey, product, TimeSpan.FromMinutes(10));
+            
 
             return product;
         }
 
-        public string Create(CreateProductDto dto)
+        public async Task<ApiResponse> Create(CreateProductDto dto)
         {
-            var product = new Product
+            var product = mapper.Map<Product>(dto);
+
+            product.ImageUrl = await imageService.UploadImageAsync(dto.Image);
+
+             await productRepository.Add(product);
+            logger.LogInformation("Creating product {ProductName}", product.Name);
+
+            await productRepository.SaveChangesAsync();
+            logger.LogInformation("Product {ProductName} created successfully", product.Name);
+
+            cache.Remove("products");
+
+            return new ApiResponse
             {
-                Name = dto.Name,
-                Description = dto.Description,
-                Price = dto.Price,
-                StockQuantity = dto.StockQuantity
+                Success = true,
+                Message = "Product created successfully"
             };
-
-            context.Products.Add(product);
-            context.SaveChanges();
-
-            return "Product created";
         }
 
-        public string Update(int id, UpdateProductDto dto)
+        public async Task<ApiResponse> Update(int id, UpdateProductDto dto)
         {
-            var product = context.Products.FirstOrDefault(x=> x.Id == id);
-            if (product == null) throw new Exception("Product not found");
+            var product =   await productRepository.GetById(id);
 
-            product.Name = dto.Name;
-            product.Description = dto.Description;
-            product.Price = dto.Price;
-            product.StockQuantity = dto.StockQuantity;
+            if (product == null)
+            throw new Exception("Product not found");
+            logger.LogWarning("Product with ID {ProductId} was not found", id);
 
-            context.SaveChanges();
+            mapper.Map(dto, product);
 
-            return "Product updated";
+            if (dto.Image != null)
+            {
+                imageService.DeleteImage(product.ImageUrl);
+
+                product.ImageUrl =
+                    await imageService.UploadImageAsync(dto.Image);
+            }
+
+            productRepository.Update(product);
+
+            await productRepository.SaveChangesAsync();
+
+            cache.Remove("products");
+
+            return new ApiResponse
+            {
+                Success = true,
+                Message = "Product updated successfully"
+            };
         }
 
-        public string Delete(int id)
+        public async Task<ApiResponse> Delete(int id)
         {
-            var product = context.Products.FirstOrDefault(x => x.Id == id); ;
+            var product = await productRepository.GetById(id); ;
             if (product == null) throw new Exception("Product not found");
 
-            context.Products.Remove(product);
-            context.SaveChanges();
+            logger.LogWarning("Product with ID {ProductId} was not found", id);
 
-            return "Product deleted";
+            imageService.DeleteImage(product.ImageUrl);
+
+            productRepository.Delete(product);
+
+            await productRepository.SaveChangesAsync();
+
+            cache.Remove("products");
+
+            return new ApiResponse
+            {
+                Success = true,
+                Message = "Product deleted successfully"
+            };
         }
     }
 }

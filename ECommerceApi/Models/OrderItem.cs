@@ -1,5 +1,6 @@
 ﻿namespace ECommerceApi.Models
 {
+#pragma warning disable CS1591
     public class OrderItem
     {
         public int Id { get; set; }

@@ -6,6 +6,7 @@ using System.Text;
 
 namespace ECommerceApi.Services
 {
+#pragma warning disable CS1591
     public class JwtService
     {
         private readonly IConfiguration config;
@@ -24,8 +25,11 @@ namespace ECommerceApi.Services
             new Claim(ClaimTypes.Role, user.Role)
         };
 
+            var jwtKey = config["Jwt:Key"]
+    ?? throw new InvalidOperationException("JWT Secret Key 'Jwt:Key' is missing from configuration.");
+
             var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(config["Jwt:Key"])
+                Encoding.UTF8.GetBytes(jwtKey)
             );
 
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);

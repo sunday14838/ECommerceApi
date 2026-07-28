@@ -3,6 +3,7 @@ using System.Security.Cryptography;
 
 namespace ECommerceApi.Services
 {
+#pragma warning disable CS1591
     public class PasswordService
     {
         public string HashPassword(string password)

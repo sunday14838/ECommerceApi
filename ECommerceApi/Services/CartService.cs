@@ -1,21 +1,29 @@
-﻿using ECommerceApi.Data;
+﻿using AutoMapper;
+using ECommerceApi.Data;
 using ECommerceApi.DTOs;
 using ECommerceApi.Models;
+using ECommerceApi.Repositories.Interfaces;
+using System.Threading.Tasks;
 
 namespace ECommerceApi.Services
 {
+#pragma warning disable CS1591
     public class CartService
     {
-        private readonly AppDbContext _context;
+        private readonly ICartRepository cartRepository;
+        private readonly IProductRepository productRepository;
+        private readonly IMapper mapper;
 
-        public CartService(AppDbContext context)
+        public CartService(ICartRepository cartRepository, IProductRepository productRepository, IMapper mapper)
         {
-            _context = context;
+            this.cartRepository = cartRepository;
+            this.productRepository = productRepository;
+            this.mapper = mapper;
         }
 
-        public string AddToCart(int userId, AddToCartDto dto)
+        public async Task<string> AddToCart(int userId, AddToCartDto dto)
         {
-            var product = _context.Products.Find(dto.ProductId);
+            var product = await productRepository.GetByIdAsync(dto.ProductId);
 
             if (product == null)
                 throw new Exception("Product not found");
@@ -23,10 +31,7 @@ namespace ECommerceApi.Services
             if (product.StockQuantity < dto.Quantity)
                 throw new Exception("Insufficient stock");
 
-            var existingCartItem = _context.CartItems
-                .FirstOrDefault(c =>
-                    c.UserId == userId &&
-                    c.ProductId == dto.ProductId);
+            var existingCartItem =  await cartRepository.GetItem(userId, dto.ProductId);
 
             if (existingCartItem != null)
             {
@@ -34,41 +39,31 @@ namespace ECommerceApi.Services
             }
             else
             {
-                var cartItem = new CartItem
-                {
-                    UserId = userId,
-                    ProductId = dto.ProductId,
-                    Quantity = dto.Quantity
-                };
-
-                _context.CartItems.Add(cartItem);
+                var cartItem = mapper.Map<CartItem>(dto);
+                cartItem.UserId = userId;
+                await cartRepository.Add(cartItem);
             }
 
-            _context.SaveChanges();
+            await cartRepository.SaveChangesAsync();
 
             return "Item added to cart";
         }
 
-        public List<CartItem> GetUserCart(int userId)
+        public async Task<List<CartItem>> GetUserCart(int userId)
         {
-            return _context.CartItems
-                .Where(c => c.UserId == userId)
-                .ToList();
+            return await cartRepository.GetUserCart(userId);
         }
 
-        public string RemoveFromCart(int userId, int cartItemId)
+        public async Task<string> RemoveFromCart(int userId, int cartItemId)
         {
-            var cartItem = _context.CartItems
-                .FirstOrDefault(c =>
-                    c.Id == cartItemId &&
-                    c.UserId == userId);
+            var cartItem =  await cartRepository.GetItem(userId, cartItemId);
 
             if (cartItem == null)
                 throw new Exception("Cart item not found");
 
-            _context.CartItems.Remove(cartItem);
+            cartRepository.Delete(cartItem);
 
-            _context.SaveChanges();
+            await cartRepository.SaveChangesAsync();
 
             return "Item removed";
         }
