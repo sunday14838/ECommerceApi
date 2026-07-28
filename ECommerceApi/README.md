@@ -354,7 +354,7 @@ This allows future versions of the API to be introduced without breaking existin
 ## Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_GITHUB_USERNAME/ECommerceApi.git
+git clone https://github.com/sunday14838/ECommerceApi.git
 ```
 
 ---
@@ -458,27 +458,6 @@ The following features can be added in future versions:
 
 ---
 
-# 💡 What I Learned
-
-This project strengthened my understanding of:
-
-- ASP.NET Core Web API
-- Clean API Design
-- Authentication & Authorization
-- Entity Framework Core
-- SQL Server
-- Repository Pattern
-- Dependency Injection
-- Validation
-- Exception Handling
-- Logging
-- Caching
-- Unit Testing
-- API Versioning
-- RESTful API Best Practices
-
----
-
 # 👨‍💻 Author
 
 **Sunday Adegboye**
@@ -486,10 +465,10 @@ This project strengthened my understanding of:
 Backend Developer | ASP.NET Core | C# | SQL Server
 
 GitHub:
-https://github.com/YOUR_GITHUB_USERNAME
+https://github.com/sunday14838
 
 LinkedIn:
-https://www.linkedin.com/in/YOUR_LINKEDIN_PROFILE
+https://www.linkedin.com/in/adegboye-sunday-88bbb9237
 
 ---
 
